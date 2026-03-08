@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import {
   Users,
   Building2,
@@ -13,12 +13,13 @@ import {
   X,
   ChevronRight,
 } from 'lucide-react';
+
 import { useAuth } from '../../context/useAuth';
+import { apiGet } from '../../lib/api';
 import StudentManagement from './StudentManagement';
 import CompanyManagement from './CompanyManagement';
 import JobDriveManagement from './JobDriveManagement';
 import ApprovalRequests from './ApprovalRequests';
-import { apiGet } from '../../lib/api';
 import NoticeBoard from '../common/NoticeBoard';
 
 interface DashboardMetrics {
@@ -36,7 +37,7 @@ interface DashboardMetrics {
   batchStats: { batch: number; count: number }[];
 }
 
-type AdminTab = 'dashboard' | 'students' | 'companies' | 'jobs' | 'approvals';
+type AdminTab = 'dashboard' | 'students' | 'companies' | 'jobs' | 'approvals' | 'notices';
 
 type MenuItem = {
   id: AdminTab;
@@ -50,6 +51,7 @@ const menuItems: MenuItem[] = [
   { id: 'students', label: 'All Students', icon: Users },
   { id: 'companies', label: 'Companies', icon: Building2 },
   { id: 'jobs', label: 'Job Drives', icon: Briefcase },
+  { id: 'notices', label: 'Notices', icon: FileText },
 ];
 
 export default function AdminDashboard() {
@@ -72,7 +74,7 @@ export default function AdminDashboard() {
   const { logout } = useAuth();
 
   useEffect(() => {
-    loadMetrics();
+    loadMetrics().catch(() => undefined);
   }, []);
 
   const loadMetrics = async () => {
@@ -92,8 +94,8 @@ export default function AdminDashboard() {
         batch_stats: Array<{ batch: number; count: number }>;
       } | null;
     }>('/admin/metrics');
-    const row = result.metrics;
 
+    const row = result.metrics;
     if (!row) {
       console.error('Failed to load dashboard metrics');
       return;
@@ -125,13 +127,10 @@ export default function AdminDashboard() {
         return <JobDriveManagement />;
       case 'approvals':
         return <ApprovalRequests onUpdate={loadMetrics} />;
+      case 'notices':
+        return <NoticeBoard isAdmin={true} />;
       default:
-        return (
-          <div className="space-y-6">
-            <DashboardMetrics metrics={metrics} />
-            <NoticeBoard isAdmin={true} />
-          </div>
-        );
+        return <DashboardMetricsPanel metrics={metrics} onOpenTab={setActiveTab} />;
     }
   };
 
@@ -198,11 +197,7 @@ export default function AdminDashboard() {
             <h1 className="text-base font-bold text-gray-900">TPO Admin Portal</h1>
             <p className="text-xs text-gray-600">AISSMS IOIT</p>
           </div>
-          <button
-            onClick={logout}
-            className="p-2 hover:bg-gray-100 rounded-lg"
-            aria-label="Logout"
-          >
+          <button onClick={logout} className="p-2 hover:bg-gray-100 rounded-lg" aria-label="Logout">
             <LogOut className="w-5 h-5 text-gray-700" />
           </button>
         </div>
@@ -263,7 +258,13 @@ export default function AdminDashboard() {
   );
 }
 
-function DashboardMetrics({ metrics }: { metrics: DashboardMetrics }) {
+function DashboardMetricsPanel({
+  metrics,
+  onOpenTab,
+}: {
+  metrics: DashboardMetrics;
+  onOpenTab: (tab: AdminTab) => void;
+}) {
   const statCards = [
     { label: 'Total Students', value: metrics.totalStudents, icon: Users, color: 'blue' },
     { label: 'Approved', value: metrics.approvedStudents, icon: UserCheck, color: 'green' },
@@ -278,6 +279,16 @@ function DashboardMetrics({ metrics }: { metrics: DashboardMetrics }) {
     { label: 'Applications', value: metrics.totalApplications, icon: FileText, color: 'pink' },
   ];
 
+  const tabByLabel: Record<string, AdminTab> = {
+    'Total Students': 'students',
+    Approved: 'students',
+    Pending: 'approvals',
+    Blocked: 'students',
+    Companies: 'companies',
+    'Active Drives': 'jobs',
+    Applications: 'jobs',
+  };
+
   const colorClasses: Record<string, { bg: string; text: string }> = {
     blue: { bg: 'bg-blue-100', text: 'text-blue-600' },
     green: { bg: 'bg-green-100', text: 'text-green-600' },
@@ -291,13 +302,43 @@ function DashboardMetrics({ metrics }: { metrics: DashboardMetrics }) {
     pink: { bg: 'bg-pink-100', text: 'text-pink-600' },
   };
 
+  const exportSummaryCsv = () => {
+    const lines = [
+      'metric,value',
+      ...statCards.map((c) => `"${c.label.replace(/"/g, '""')}",${c.value}`),
+      '',
+      'batch,count',
+      ...metrics.batchStats.map((b) => `${b.batch},${b.count}`),
+    ];
+    const blob = new Blob([lines.join('\n')], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `dashboard_summary_${new Date().toISOString().slice(0, 10)}.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
+  };
+
   return (
     <div className="space-y-8">
+      <div className="flex justify-end">
+        <button
+          onClick={exportSummaryCsv}
+          className="px-3 py-2 text-sm bg-emerald-600 text-white rounded-lg hover:bg-emerald-700"
+        >
+          Export Summary
+        </button>
+      </div>
+
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
         {statCards.map((stat) => {
           const colors = colorClasses[stat.color];
           return (
-            <div key={stat.label} className="bg-white rounded-xl shadow-sm p-6 border border-gray-200">
+            <button
+              key={stat.label}
+              onClick={() => onOpenTab(tabByLabel[stat.label] || 'dashboard')}
+              className="bg-white rounded-xl shadow-sm p-6 border border-gray-200 text-left hover:shadow-md transition-shadow"
+            >
               <div className="flex items-center justify-between mb-4">
                 <div className={`w-12 h-12 ${colors.bg} rounded-lg flex items-center justify-center`}>
                   <stat.icon className={`w-6 h-6 ${colors.text}`} />
@@ -305,7 +346,7 @@ function DashboardMetrics({ metrics }: { metrics: DashboardMetrics }) {
               </div>
               <h3 className="text-2xl font-bold text-gray-900">{stat.value}</h3>
               <p className="text-sm text-gray-600 mt-1">{stat.label}</p>
-            </div>
+            </button>
           );
         })}
       </div>

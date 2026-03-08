@@ -10,7 +10,7 @@ export type BlockReason =
   | 'PLACED_PPO'
   | 'PLACED_INTERNSHIP';
 export type ApplicationStatus = 'APPLIED' | 'SHORTLISTED' | 'INTERVIEW' | 'SELECTED' | 'REJECTED';
-export type Branch = 'COMPUTER' | 'IT' | 'ENTC' | 'MECHANICAL' | 'CIVIL' | 'INSTRUMENTATION';
+export type Branch = 'COMPUTER' | 'IT' | 'AIDS' | 'ENTC' | 'ELECTRICAL' | 'INSTRUMENTATION' | 'MECHANICAL' | 'CIVIL';
 export type QuestionType = 'text' | 'textarea' | 'number' | 'file' | 'dropdown' | 'radio';
 
 export interface Student {
@@ -19,12 +19,22 @@ export interface Student {
   prn: string;
   password_hash: string;
   full_name: string;
+  first_name?: string;
+  middle_name?: string;
+  last_name?: string;
+  mother_name?: string;
+  date_of_birth?: string;
+  is_handicapped?: boolean;
+  handicap_details?: string;
   email: string;
   phone: string;
   branch: Branch;
+  division?: 'A' | 'B';
   batch_year: number;
   graduation_year: number;
   current_cgpa: number;
+  tenth_percentage?: number;
+  twelfth_percentage?: number;
   backlogs: number;
   profile_photo_url?: string;
   resume_url?: string;

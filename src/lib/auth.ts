@@ -100,8 +100,12 @@ export async function registerStudent(data: {
   email: string;
   phone: string;
   branch: string;
+  division: 'A' | 'B';
   batch_year: number;
   graduation_year: number;
+  current_cgpa: number;
+  tenth_percentage: number;
+  twelfth_percentage: number;
 }): Promise<AuthResponse> {
   try {
     const response = await apiPost<AuthResponse>('/auth/register/student', data);

@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { UserPlus, ArrowLeft } from 'lucide-react';
 import { registerStudent } from '../lib/auth';
 import type { Branch } from '../lib/database.types';
@@ -7,7 +7,22 @@ interface RegisterProps {
   onBackToLogin: () => void;
 }
 
+type Division = 'A' | 'B';
+
+const BRANCH_OPTIONS: Array<{ value: Branch; label: string; divisions: Division[] }> = [
+  { value: 'COMPUTER', label: 'CS (A, B)', divisions: ['A', 'B'] },
+  { value: 'IT', label: 'IT (A, B)', divisions: ['A', 'B'] },
+  { value: 'AIDS', label: 'AIDS (A, B)', divisions: ['A', 'B'] },
+  { value: 'ENTC', label: 'E&TC (A, B)', divisions: ['A', 'B'] },
+  { value: 'ELECTRICAL', label: 'Electrical', divisions: ['A'] },
+  { value: 'INSTRUMENTATION', label: 'Instrumentation', divisions: ['A'] },
+];
+
 export default function Register({ onBackToLogin }: RegisterProps) {
+  const currentYear = new Date().getFullYear();
+  const minPassoutYear = 2027;
+  const passoutStart = Math.max(currentYear, minPassoutYear);
+
   const [formData, setFormData] = useState({
     prn: '',
     password: '',
@@ -16,16 +31,30 @@ export default function Register({ onBackToLogin }: RegisterProps) {
     email: '',
     phone: '',
     branch: 'COMPUTER' as Branch,
-    batch_year: new Date().getFullYear(),
-    graduation_year: new Date().getFullYear() + 4,
+    division: 'A' as Division,
+    batch_year: currentYear,
+    graduation_year: passoutStart,
+    current_cgpa: 0,
+    tenth_percentage: 0,
+    twelfth_percentage: 0,
   });
   const [error, setError] = useState('');
   const [success, setSuccess] = useState(false);
   const [loading, setLoading] = useState(false);
 
-  const branches: Branch[] = ['COMPUTER', 'IT', 'ENTC', 'MECHANICAL', 'CIVIL', 'INSTRUMENTATION'];
-  const currentYear = new Date().getFullYear();
-  const years = Array.from({ length: 5 }, (_, i) => currentYear + i);
+  const selectedBranch = useMemo(
+    () => BRANCH_OPTIONS.find((b) => b.value === formData.branch) || BRANCH_OPTIONS[0],
+    [formData.branch]
+  );
+
+  const passoutYears = Array.from({ length: 8 }, (_, i) => passoutStart + i);
+  const batchYears = Array.from({ length: 6 }, (_, i) => currentYear - 3 + i);
+
+  const handleBranchChange = (branch: Branch) => {
+    const next = BRANCH_OPTIONS.find((b) => b.value === branch) || BRANCH_OPTIONS[0];
+    const nextDivision = next.divisions.includes(formData.division) ? formData.division : 'A';
+    setFormData({ ...formData, branch, division: nextDivision });
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -41,6 +70,31 @@ export default function Register({ onBackToLogin }: RegisterProps) {
       return;
     }
 
+    if (formData.graduation_year < minPassoutYear) {
+      setError(`Only passout year ${minPassoutYear} and above is allowed`);
+      return;
+    }
+
+    if (formData.current_cgpa < 0 || formData.current_cgpa > 10) {
+      setError('CGPA must be between 0 and 10');
+      return;
+    }
+
+    if (formData.tenth_percentage < 0 || formData.tenth_percentage > 100) {
+      setError('10th percentage must be between 0 and 100');
+      return;
+    }
+
+    if (formData.twelfth_percentage < 0 || formData.twelfth_percentage > 100) {
+      setError('12th percentage must be between 0 and 100');
+      return;
+    }
+
+    if (!selectedBranch.divisions.includes(formData.division)) {
+      setError('Invalid division selected for branch');
+      return;
+    }
+
     setLoading(true);
 
     try {
@@ -51,8 +105,12 @@ export default function Register({ onBackToLogin }: RegisterProps) {
         email: formData.email,
         phone: formData.phone,
         branch: formData.branch,
+        division: formData.division,
         batch_year: formData.batch_year,
         graduation_year: formData.graduation_year,
+        current_cgpa: formData.current_cgpa,
+        tenth_percentage: formData.tenth_percentage,
+        twelfth_percentage: formData.twelfth_percentage,
       });
 
       if (response.success) {
@@ -109,9 +167,7 @@ export default function Register({ onBackToLogin }: RegisterProps) {
           <form onSubmit={handleSubmit} className="space-y-4">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  PRN <span className="text-red-500">*</span>
-                </label>
+                <label className="block text-sm font-medium text-gray-700 mb-2">PRN <span className="text-red-500">*</span></label>
                 <input
                   type="text"
                   required
@@ -123,9 +179,7 @@ export default function Register({ onBackToLogin }: RegisterProps) {
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Full Name <span className="text-red-500">*</span>
-                </label>
+                <label className="block text-sm font-medium text-gray-700 mb-2">Full Name <span className="text-red-500">*</span></label>
                 <input
                   type="text"
                   required
@@ -137,9 +191,7 @@ export default function Register({ onBackToLogin }: RegisterProps) {
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Email <span className="text-red-500">*</span>
-                </label>
+                <label className="block text-sm font-medium text-gray-700 mb-2">Email <span className="text-red-500">*</span></label>
                 <input
                   type="email"
                   required
@@ -151,9 +203,7 @@ export default function Register({ onBackToLogin }: RegisterProps) {
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Phone <span className="text-red-500">*</span>
-                </label>
+                <label className="block text-sm font-medium text-gray-700 mb-2">Phone <span className="text-red-500">*</span></label>
                 <input
                   type="tel"
                   required
@@ -165,34 +215,46 @@ export default function Register({ onBackToLogin }: RegisterProps) {
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Branch <span className="text-red-500">*</span>
-                </label>
+                <label className="block text-sm font-medium text-gray-700 mb-2">Branch <span className="text-red-500">*</span></label>
                 <select
                   required
                   value={formData.branch}
-                  onChange={(e) => setFormData({ ...formData, branch: e.target.value as Branch })}
+                  onChange={(e) => handleBranchChange(e.target.value as Branch)}
                   className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                 >
-                  {branches.map((branch) => (
-                    <option key={branch} value={branch}>
-                      {branch}
+                  {BRANCH_OPTIONS.map((branch) => (
+                    <option key={branch.value} value={branch.value}>
+                      {branch.label}
                     </option>
                   ))}
                 </select>
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Batch Year <span className="text-red-500">*</span>
-                </label>
+                <label className="block text-sm font-medium text-gray-700 mb-2">Division <span className="text-red-500">*</span></label>
+                <select
+                  required
+                  value={formData.division}
+                  onChange={(e) => setFormData({ ...formData, division: e.target.value as Division })}
+                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                >
+                  {selectedBranch.divisions.map((division) => (
+                    <option key={division} value={division}>
+                      {division}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">Batch Year <span className="text-red-500">*</span></label>
                 <select
                   required
                   value={formData.batch_year}
-                  onChange={(e) => setFormData({ ...formData, batch_year: parseInt(e.target.value) })}
+                  onChange={(e) => setFormData({ ...formData, batch_year: parseInt(e.target.value, 10) })}
                   className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                 >
-                  {years.map((year) => (
+                  {batchYears.map((year) => (
                     <option key={year} value={year}>
                       {year}
                     </option>
@@ -201,9 +263,65 @@ export default function Register({ onBackToLogin }: RegisterProps) {
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Password <span className="text-red-500">*</span>
-                </label>
+                <label className="block text-sm font-medium text-gray-700 mb-2">Passout Year <span className="text-red-500">*</span></label>
+                <select
+                  required
+                  value={formData.graduation_year}
+                  onChange={(e) => setFormData({ ...formData, graduation_year: parseInt(e.target.value, 10) })}
+                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                >
+                  {passoutYears.map((year) => (
+                    <option key={year} value={year}>
+                      {year}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">Current CGPA <span className="text-red-500">*</span></label>
+                <input
+                  type="number"
+                  min="0"
+                  max="10"
+                  step="0.01"
+                  required
+                  value={formData.current_cgpa}
+                  onChange={(e) => setFormData({ ...formData, current_cgpa: parseFloat(e.target.value) || 0 })}
+                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">10th Percentage <span className="text-red-500">*</span></label>
+                <input
+                  type="number"
+                  min="0"
+                  max="100"
+                  step="0.01"
+                  required
+                  value={formData.tenth_percentage}
+                  onChange={(e) => setFormData({ ...formData, tenth_percentage: parseFloat(e.target.value) || 0 })}
+                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">12th Percentage <span className="text-red-500">*</span></label>
+                <input
+                  type="number"
+                  min="0"
+                  max="100"
+                  step="0.01"
+                  required
+                  value={formData.twelfth_percentage}
+                  onChange={(e) => setFormData({ ...formData, twelfth_percentage: parseFloat(e.target.value) || 0 })}
+                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">Password <span className="text-red-500">*</span></label>
                 <input
                   type="password"
                   required
@@ -215,9 +333,7 @@ export default function Register({ onBackToLogin }: RegisterProps) {
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Confirm Password <span className="text-red-500">*</span>
-                </label>
+                <label className="block text-sm font-medium text-gray-700 mb-2">Confirm Password <span className="text-red-500">*</span></label>
                 <input
                   type="password"
                   required

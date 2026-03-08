@@ -178,6 +178,16 @@ export default function ApprovalRequests({ onUpdate }: ApprovalRequestsProps) {
                     <span className="text-xs text-gray-600">Batch</span>
                     <p className="font-medium text-gray-900">{student.batch_year}</p>
                   </div>
+                  <div className="bg-gray-50 rounded-lg p-2 text-center">
+                    <Award className="w-4 h-4 text-gray-500 mx-auto mb-1" />
+                    <span className="text-xs text-gray-600">CGPA</span>
+                    <p className="font-medium text-gray-900">{student.current_cgpa ?? '-'}</p>
+                  </div>
+                  <div className="bg-gray-50 rounded-lg p-2 text-center">
+                    <Award className="w-4 h-4 text-gray-500 mx-auto mb-1" />
+                    <span className="text-xs text-gray-600">Backlogs</span>
+                    <p className="font-medium text-gray-900">{student.backlogs ?? '-'}</p>
+                  </div>
                 </div>
 
                 {/* Action Buttons */}
@@ -280,6 +290,10 @@ export default function ApprovalRequests({ onUpdate }: ApprovalRequestsProps) {
                       <p className="text-sm font-medium text-gray-900">{selectedStudent.branch}</p>
                     </div>
                     <div>
+                      <p className="text-xs text-gray-500">Division</p>
+                      <p className="text-sm text-gray-900">{selectedStudent.division || 'A'}</p>
+                    </div>
+                    <div>
                       <p className="text-xs text-gray-500">Batch Year</p>
                       <p className="text-sm text-gray-900">{selectedStudent.batch_year}</p>
                     </div>
@@ -299,11 +313,19 @@ export default function ApprovalRequests({ onUpdate }: ApprovalRequestsProps) {
                   <div className="space-y-3">
                     <div>
                       <p className="text-xs text-gray-500">Current CGPA</p>
-                      <p className="text-sm font-medium text-gray-900">{selectedStudent.current_cgpa}</p>
+                      <p className="text-sm font-medium text-gray-900">{selectedStudent.current_cgpa ?? '-'}</p>
+                    </div>
+                    <div>
+                      <p className="text-xs text-gray-500">10th Percentage</p>
+                      <p className="text-sm text-gray-900">{selectedStudent.tenth_percentage ?? '-'}</p>
+                    </div>
+                    <div>
+                      <p className="text-xs text-gray-500">12th Percentage</p>
+                      <p className="text-sm text-gray-900">{selectedStudent.twelfth_percentage ?? '-'}</p>
                     </div>
                     <div>
                       <p className="text-xs text-gray-500">Backlogs</p>
-                      <p className="text-sm text-gray-900">{selectedStudent.backlogs}</p>
+                      <p className="text-sm text-gray-900">{selectedStudent.backlogs ?? '-'}</p>
                     </div>
                   </div>
                 </div>

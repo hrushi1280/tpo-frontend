@@ -224,13 +224,7 @@ export default function StudentDashboard() {
           </div>
         );
       case 'tpo-registration':
-        return (
-          <div className="text-center py-12">
-            <ClipboardList className="w-16 h-16 text-gray-400 mx-auto mb-4" />
-            <h3 className="text-lg font-medium text-gray-900 mb-2">TPO Registration</h3>
-            <p className="text-gray-600">No registrations available</p>
-          </div>
-        );
+        return <StudentProfile student={student} onUpdate={loadData} showAsRegistration={true} />;
       case 'tracking':
         return (
           <div className="text-center py-12">
@@ -682,39 +676,123 @@ function ApplicationList({
 }
 
 // Student Profile Component
-function StudentProfile({ student, onUpdate }: { student: Student; onUpdate: () => void }) {
-  const [editing, setEditing] = useState(false);
+function StudentProfile({
+  student,
+  onUpdate,
+  showAsRegistration = false,
+}: {
+  student: Student;
+  onUpdate: () => void;
+  showAsRegistration?: boolean;
+}) {
+  const [editing, setEditing] = useState(showAsRegistration);
+  const [saving, setSaving] = useState(false);
+  const [history, setHistory] = useState<Array<{ id: string; field_name: string; old_value: string | null; new_value: string | null; changed_at: string }>>([]);
+
   const [formData, setFormData] = useState({
+    first_name: student.first_name || '',
+    middle_name: student.middle_name || '',
+    last_name: student.last_name || '',
+    mother_name: student.mother_name || '',
+    date_of_birth: student.date_of_birth || '',
+    is_handicapped: !!student.is_handicapped,
+    handicap_details: student.handicap_details || '',
     current_cgpa: student.current_cgpa,
     backlogs: student.backlogs,
     phone: student.phone,
+    email: student.email,
+    division: (student.division || 'A') as 'A' | 'B',
+    tenth_percentage: student.tenth_percentage ?? 0,
+    twelfth_percentage: student.twelfth_percentage ?? 0,
   });
-  const [saving, setSaving] = useState(false);
+
+  useEffect(() => {
+    const loadHistory = async () => {
+      try {
+        const response = await apiGet<{ data: Array<{ id: string; field_name: string; old_value: string | null; new_value: string | null; changed_at: string }> }>(
+          `/students/${student.id}/profile-history?limit=15`
+        );
+        setHistory(response.data || []);
+      } catch (error) {
+        console.error('Failed to load profile history', error);
+      }
+    };
+
+    loadHistory();
+  }, [student.id, saving]);
+
+  const fieldLabel = (field: string) => {
+    const labels: Record<string, string> = {
+      current_cgpa: 'CGPA',
+      backlogs: 'Backlogs',
+      tenth_percentage: '10th Percentage',
+      twelfth_percentage: '12th Percentage',
+      phone: 'Phone',
+      email: 'Email',
+      division: 'Division',
+      first_name: 'First Name',
+      middle_name: 'Middle Name',
+      last_name: 'Last Name',
+      mother_name: 'Mother Name',
+      date_of_birth: 'Date of Birth',
+      is_handicapped: 'Handicapped',
+      handicap_details: 'Handicap Details',
+    };
+    return labels[field] || field;
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+
+    if (formData.current_cgpa < 0 || formData.current_cgpa > 10) {
+      alert('CGPA must be between 0 and 10');
+      return;
+    }
+
+    if (formData.tenth_percentage < 0 || formData.tenth_percentage > 100) {
+      alert('10th percentage must be between 0 and 100');
+      return;
+    }
+
+    if (formData.twelfth_percentage < 0 || formData.twelfth_percentage > 100) {
+      alert('12th percentage must be between 0 and 100');
+      return;
+    }
+
     setSaving(true);
-    
+
     try {
       await apiPatch(`/students/${student.id}`, {
         data: {
-        current_cgpa: formData.current_cgpa,
-        backlogs: formData.backlogs,
-        phone: formData.phone,
-      }});
+          first_name: formData.first_name,
+          middle_name: formData.middle_name,
+          last_name: formData.last_name,
+          mother_name: formData.mother_name,
+          date_of_birth: formData.date_of_birth || null,
+          is_handicapped: formData.is_handicapped,
+          handicap_details: formData.is_handicapped ? formData.handicap_details : null,
+          current_cgpa: formData.current_cgpa,
+          backlogs: formData.backlogs,
+          phone: formData.phone,
+          email: formData.email,
+          division: formData.division,
+          tenth_percentage: formData.tenth_percentage,
+          twelfth_percentage: formData.twelfth_percentage,
+        },
+      });
       setEditing(false);
       onUpdate();
     } catch (error) {
       console.error('Failed to update profile', error);
+      alert('Failed to update profile');
     }
-    
+
     setSaving(false);
   };
 
   return (
-    <div className="max-w-3xl">
+    <div className="max-w-4xl space-y-6">
       <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
-        {/* Header */}
         <div className="p-4 sm:p-6 border-b border-gray-200 bg-gradient-to-r from-blue-50 to-white">
           <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
             <div className="flex items-center gap-3">
@@ -722,7 +800,7 @@ function StudentProfile({ student, onUpdate }: { student: Student; onUpdate: () 
                 <User className="w-6 h-6 text-white" />
               </div>
               <div>
-                <h2 className="text-xl font-bold text-gray-900">{student.full_name}</h2>
+                <h2 className="text-xl font-bold text-gray-900">{showAsRegistration ? 'TPO Registration' : 'Fill Profile'}</h2>
                 <p className="text-sm text-gray-600">{student.prn}</p>
               </div>
             </div>
@@ -737,138 +815,120 @@ function StudentProfile({ student, onUpdate }: { student: Student; onUpdate: () 
           </div>
         </div>
 
-        {/* Content */}
         <div className="p-4 sm:p-6">
           {editing ? (
             <form onSubmit={handleSubmit} className="space-y-4">
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">First Name</label>
+                  <input value={formData.first_name} onChange={(e) => setFormData({ ...formData, first_name: e.target.value })} className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500" required />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">Middle Name</label>
+                  <input value={formData.middle_name} onChange={(e) => setFormData({ ...formData, middle_name: e.target.value })} className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500" />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">Last Name</label>
+                  <input value={formData.last_name} onChange={(e) => setFormData({ ...formData, last_name: e.target.value })} className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500" required />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">Mother Name</label>
+                  <input value={formData.mother_name} onChange={(e) => setFormData({ ...formData, mother_name: e.target.value })} className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500" required />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">Date of Birth</label>
+                  <input type="date" value={formData.date_of_birth} onChange={(e) => setFormData({ ...formData, date_of_birth: e.target.value })} className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500" />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">Handicapped</label>
+                  <select value={formData.is_handicapped ? 'yes' : 'no'} onChange={(e) => setFormData({ ...formData, is_handicapped: e.target.value === 'yes' })} className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500">
+                    <option value="no">No</option>
+                    <option value="yes">Yes</option>
+                  </select>
+                </div>
+                {formData.is_handicapped && (
+                  <div className="sm:col-span-2">
+                    <label className="block text-sm font-medium text-gray-700 mb-2">Handicap Details</label>
+                    <input value={formData.handicap_details} onChange={(e) => setFormData({ ...formData, handicap_details: e.target.value })} className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500" required />
+                  </div>
+                )}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">Email</label>
+                  <input type="email" value={formData.email} onChange={(e) => setFormData({ ...formData, email: e.target.value })} className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500" required />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">Phone</label>
+                  <input type="tel" value={formData.phone} onChange={(e) => setFormData({ ...formData, phone: e.target.value })} className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500" required />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">Division</label>
+                  <select value={formData.division} onChange={(e) => setFormData({ ...formData, division: e.target.value as 'A' | 'B' })} className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500">
+                    <option value="A">A</option>
+                    <option value="B">B</option>
+                  </select>
+                </div>
+                <div>
                   <label className="block text-sm font-medium text-gray-700 mb-2">CGPA</label>
-                  <input
-                    type="number"
-                    step="0.01"
-                    min="0"
-                    max="10"
-                    value={formData.current_cgpa}
-                    onChange={(e) => setFormData({ ...formData, current_cgpa: parseFloat(e.target.value) })}
-                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
-                    required
-                  />
+                  <input type="number" step="0.01" min="0" max="10" value={formData.current_cgpa} onChange={(e) => setFormData({ ...formData, current_cgpa: parseFloat(e.target.value) || 0 })} className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500" required />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">10th Percentage</label>
+                  <input type="number" step="0.01" min="0" max="100" value={formData.tenth_percentage} onChange={(e) => setFormData({ ...formData, tenth_percentage: parseFloat(e.target.value) || 0 })} className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500" required />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">12th Percentage</label>
+                  <input type="number" step="0.01" min="0" max="100" value={formData.twelfth_percentage} onChange={(e) => setFormData({ ...formData, twelfth_percentage: parseFloat(e.target.value) || 0 })} className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500" required />
                 </div>
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-2">Backlogs</label>
-                  <input
-                    type="number"
-                    min="0"
-                    value={formData.backlogs}
-                    onChange={(e) => setFormData({ ...formData, backlogs: parseInt(e.target.value) })}
-                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
-                    required
-                  />
-                </div>
-                <div className="sm:col-span-2">
-                  <label className="block text-sm font-medium text-gray-700 mb-2">Phone</label>
-                  <input
-                    type="tel"
-                    value={formData.phone}
-                    onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
-                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
-                    required
-                  />
-                </div>
-              </div>
-              
-              <div className="flex flex-col sm:flex-row gap-3 pt-4">
-                <button
-                  type="button"
-                  onClick={() => setEditing(false)}
-                  className="flex-1 px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors"
-                >
-                  Cancel
-                </button>
-                <button
-                  type="submit"
-                  disabled={saving}
-                  className="flex-1 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50"
-                >
-                  {saving ? 'Saving...' : 'Save Changes'}
-                </button>
-              </div>
-            </form>
-          ) : (
-            <div className="space-y-4">
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <div>
-                  <p className="text-xs text-gray-500">Email</p>
-                  <div className="flex items-center gap-2 mt-1">
-                    <Mail className="w-4 h-4 text-gray-400" />
-                    <p className="text-sm text-gray-900">{student.email}</p>
-                  </div>
-                </div>
-                <div>
-                  <p className="text-xs text-gray-500">Phone</p>
-                  <div className="flex items-center gap-2 mt-1">
-                    <Phone className="w-4 h-4 text-gray-400" />
-                    <p className="text-sm text-gray-900">{student.phone}</p>
-                  </div>
-                </div>
-                <div>
-                  <p className="text-xs text-gray-500">Branch</p>
-                  <div className="flex items-center gap-2 mt-1">
-                    <BookOpen className="w-4 h-4 text-gray-400" />
-                    <p className="text-sm text-gray-900">{student.branch}</p>
-                  </div>
-                </div>
-                <div>
-                  <p className="text-xs text-gray-500">Batch</p>
-                  <div className="flex items-center gap-2 mt-1">
-                    <GraduationCap className="w-4 h-4 text-gray-400" />
-                    <p className="text-sm text-gray-900">{student.batch_year}</p>
-                  </div>
-                </div>
-                <div>
-                  <p className="text-xs text-gray-500">CGPA</p>
-                  <p className="text-sm font-medium text-gray-900 mt-1">{student.current_cgpa}</p>
-                </div>
-                <div>
-                  <p className="text-xs text-gray-500">Backlogs</p>
-                  <p className="text-sm font-medium text-gray-900 mt-1">{student.backlogs}</p>
-                </div>
-                <div className="sm:col-span-2">
-                  <p className="text-xs text-gray-500">Placement Status</p>
-                  <div className="mt-1">
-                    <span className={`inline-flex items-center px-3 py-1 rounded-full text-xs font-medium ${
-                      student.placement_status === 'NOT_PLACED' ? 'bg-gray-100 text-gray-800' :
-                      student.placement_status === 'INTERNSHIP' ? 'bg-blue-100 text-blue-800' :
-                      student.placement_status === 'PPO' ? 'bg-purple-100 text-purple-800' :
-                      'bg-green-100 text-green-800'
-                    }`}>
-                      {student.placement_status.replace('_', ' ')}
-                    </span>
-                  </div>
+                  <input type="number" min="0" value={formData.backlogs} onChange={(e) => setFormData({ ...formData, backlogs: parseInt(e.target.value, 10) || 0 })} className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500" required />
                 </div>
               </div>
 
-              {student.placed_company_name && (
-                <div className="mt-4 pt-4 border-t border-gray-100">
-                  <h3 className="text-sm font-medium text-gray-900 mb-2">Placement Details</h3>
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                    <div>
-                      <p className="text-xs text-gray-500">Company</p>
-                      <p className="text-sm text-gray-900">{student.placed_company_name}</p>
-                    </div>
-                    {student.package_offered && (
-                      <div>
-                        <p className="text-xs text-gray-500">Package</p>
-                        <p className="text-sm text-gray-900">{student.package_offered} LPA</p>
-                      </div>
-                    )}
-                  </div>
-                </div>
-              )}
+              <div className="flex flex-col sm:flex-row gap-3 pt-4">
+                <button type="button" onClick={() => setEditing(false)} className="flex-1 px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors">Cancel</button>
+                <button type="submit" disabled={saving} className="flex-1 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50">{saving ? 'Saving...' : 'Save Changes'}</button>
+              </div>
+            </form>
+          ) : (
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-sm">
+              <p><span className="text-gray-500">Name:</span> {student.first_name || '-'} {student.middle_name || ''} {student.last_name || ''}</p>
+              <p><span className="text-gray-500">Mother Name:</span> {student.mother_name || '-'}</p>
+              <p><span className="text-gray-500">Date of Birth:</span> {student.date_of_birth || '-'}</p>
+              <p><span className="text-gray-500">Handicapped:</span> {student.is_handicapped ? 'Yes' : 'No'}</p>
+              <p><span className="text-gray-500">Handicap Details:</span> {student.handicap_details || '-'}</p>
+              <p><span className="text-gray-500">Email:</span> {student.email}</p>
+              <p><span className="text-gray-500">Phone:</span> {student.phone}</p>
+              <p><span className="text-gray-500">Branch:</span> {student.branch}</p>
+              <p><span className="text-gray-500">Division:</span> {student.division || '-'}</p>
+              <p><span className="text-gray-500">Passout Year:</span> {student.graduation_year}</p>
+              <p><span className="text-gray-500">CGPA:</span> {student.current_cgpa}</p>
+              <p><span className="text-gray-500">Backlogs:</span> {student.backlogs}</p>
+              <p><span className="text-gray-500">10th Percentage:</span> {student.tenth_percentage ?? '-'}</p>
+              <p><span className="text-gray-500">12th Percentage:</span> {student.twelfth_percentage ?? '-'}</p>
             </div>
           )}
         </div>
+      </div>
+
+      <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-4 sm:p-6">
+        <h3 className="text-lg font-semibold text-gray-900 mb-4">Last Profile Updates</h3>
+        {history.length === 0 ? (
+          <p className="text-sm text-gray-500">No edits yet.</p>
+        ) : (
+          <div className="space-y-3">
+            {history.map((entry) => (
+              <div key={entry.id} className="p-3 rounded-lg bg-gray-50 border border-gray-200">
+                <p className="text-sm font-medium text-gray-900">
+                  {fieldLabel(entry.field_name)}: {entry.old_value ?? '-'} → {entry.new_value ?? '-'}
+                </p>
+                <p className="text-xs text-gray-500 mt-1">
+                  {new Date(entry.changed_at).toLocaleString()}
+                </p>
+              </div>
+            ))}
+          </div>
+        )}
       </div>
     </div>
   );
