@@ -1,5 +1,18 @@
 import { useState, useEffect } from 'react';
-import { Users, Building2, Briefcase, FileText, LogOut, UserCheck, UserX, Award, Clock } from 'lucide-react';
+import {
+  Users,
+  Building2,
+  Briefcase,
+  FileText,
+  LogOut,
+  UserCheck,
+  UserX,
+  Award,
+  Clock,
+  Menu,
+  X,
+  ChevronRight,
+} from 'lucide-react';
 import { useAuth } from '../../context/useAuth';
 import StudentManagement from './StudentManagement';
 import CompanyManagement from './CompanyManagement';
@@ -23,6 +36,22 @@ interface DashboardMetrics {
   batchStats: { batch: number; count: number }[];
 }
 
+type AdminTab = 'dashboard' | 'students' | 'companies' | 'jobs' | 'approvals';
+
+type MenuItem = {
+  id: AdminTab;
+  label: string;
+  icon: typeof Award;
+};
+
+const menuItems: MenuItem[] = [
+  { id: 'dashboard', label: 'Dashboard', icon: Award },
+  { id: 'approvals', label: 'Approval Requests', icon: Clock },
+  { id: 'students', label: 'All Students', icon: Users },
+  { id: 'companies', label: 'Companies', icon: Building2 },
+  { id: 'jobs', label: 'Job Drives', icon: Briefcase },
+];
+
 export default function AdminDashboard() {
   const [metrics, setMetrics] = useState<DashboardMetrics>({
     totalStudents: 0,
@@ -38,7 +67,8 @@ export default function AdminDashboard() {
     totalApplications: 0,
     batchStats: [],
   });
-  const [activeTab, setActiveTab] = useState<'dashboard' | 'students' | 'companies' | 'jobs' | 'approvals'>('dashboard');
+  const [activeTab, setActiveTab] = useState<AdminTab>('dashboard');
+  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const { logout } = useAuth();
 
   useEffect(() => {
@@ -46,20 +76,22 @@ export default function AdminDashboard() {
   }, []);
 
   const loadMetrics = async () => {
-    const result = await apiGet<{ metrics: {
-      total_students: number;
-      approved_students: number;
-      blocked_students: number;
-      pending_requests: number;
-      placed_students: number;
-      internships: number;
-      ppo_count: number;
-      full_time_count: number;
-      total_companies: number;
-      active_jobs: number;
-      total_applications: number;
-      batch_stats: Array<{ batch: number; count: number }>;
-    } | null }>('/admin/metrics');
+    const result = await apiGet<{
+      metrics: {
+        total_students: number;
+        approved_students: number;
+        blocked_students: number;
+        pending_requests: number;
+        placed_students: number;
+        internships: number;
+        ppo_count: number;
+        full_time_count: number;
+        total_companies: number;
+        active_jobs: number;
+        total_applications: number;
+        batch_stats: Array<{ batch: number; count: number }>;
+      } | null;
+    }>('/admin/metrics');
     const row = result.metrics;
 
     if (!row) {
@@ -105,99 +137,128 @@ export default function AdminDashboard() {
 
   return (
     <div className="min-h-screen bg-gray-50">
-      <header className="bg-white shadow-sm border-b border-gray-200">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
-          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-            <div className="flex items-center gap-4">
-              <div className="w-12 h-12 bg-blue-600 rounded-full flex items-center justify-center">
-                <Users className="w-6 h-6 text-white" />
-              </div>
-              <div>
-                <h1 className="text-xl sm:text-2xl font-bold text-gray-900">TPO Admin Portal</h1>
-                <p className="text-sm text-gray-600">AISSMS IOIT</p>
-              </div>
+      <aside className="hidden lg:flex lg:flex-col lg:w-72 lg:fixed lg:inset-y-0 lg:bg-white lg:border-r lg:border-gray-200 lg:z-30">
+        <div className="p-4 border-b border-gray-200">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 bg-blue-600 rounded-full flex items-center justify-center">
+              <Users className="w-5 h-5 text-white" />
             </div>
-            <button
-              onClick={logout}
-              className="w-full sm:w-auto flex items-center justify-center gap-2 px-4 py-2 text-gray-700 hover:bg-gray-100 rounded-lg transition-colors"
-            >
-              <LogOut className="w-5 h-5" />
-              Logout
-            </button>
+            <div>
+              <h1 className="text-lg font-bold text-gray-900">TPO Admin</h1>
+              <p className="text-xs text-gray-600">AISSMS IOIT</p>
+            </div>
           </div>
+        </div>
+
+        <nav className="flex-1 overflow-y-auto py-4">
+          <ul className="space-y-1 px-3">
+            {menuItems.map((item) => (
+              <li key={item.id}>
+                <button
+                  onClick={() => setActiveTab(item.id)}
+                  className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg transition-all relative ${
+                    activeTab === item.id ? 'bg-blue-50 text-blue-600' : 'text-gray-700 hover:bg-gray-100'
+                  }`}
+                >
+                  <item.icon className={`w-5 h-5 ${activeTab === item.id ? 'text-blue-600' : 'text-gray-500'}`} />
+                  <span className="text-sm font-medium flex-1 text-left">{item.label}</span>
+                  {item.id === 'approvals' && metrics.pendingRequests > 0 && (
+                    <span className="absolute top-2 right-9 bg-red-500 text-white text-xs rounded-full h-5 min-w-5 px-1 flex items-center justify-center">
+                      {metrics.pendingRequests}
+                    </span>
+                  )}
+                  {activeTab === item.id && <ChevronRight className="w-4 h-4" />}
+                </button>
+              </li>
+            ))}
+          </ul>
+        </nav>
+
+        <div className="p-4 border-t border-gray-200">
+          <button
+            onClick={logout}
+            className="w-full flex items-center gap-3 px-4 py-3 text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+          >
+            <LogOut className="w-5 h-5" />
+            <span className="text-sm font-medium">Logout</span>
+          </button>
+        </div>
+      </aside>
+
+      <header className="lg:hidden bg-white border-b border-gray-200 sticky top-0 z-40">
+        <div className="px-4 py-3 flex items-center justify-between">
+          <button
+            onClick={() => setIsMobileMenuOpen(true)}
+            className="p-2 hover:bg-gray-100 rounded-lg"
+            aria-label="Open menu"
+          >
+            <Menu className="w-5 h-5 text-gray-600" />
+          </button>
+          <div>
+            <h1 className="text-base font-bold text-gray-900">TPO Admin Portal</h1>
+            <p className="text-xs text-gray-600">AISSMS IOIT</p>
+          </div>
+          <button
+            onClick={logout}
+            className="p-2 hover:bg-gray-100 rounded-lg"
+            aria-label="Logout"
+          >
+            <LogOut className="w-5 h-5 text-gray-700" />
+          </button>
         </div>
       </header>
 
-      <nav className="bg-white border-b border-gray-200">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex gap-1 overflow-x-auto hide-scrollbar">
-            <button
-              onClick={() => setActiveTab('dashboard')}
-              className={`whitespace-nowrap px-4 sm:px-6 py-4 font-medium transition-colors relative ${
-                activeTab === 'dashboard'
-                  ? 'text-blue-600 border-b-2 border-blue-600'
-                  : 'text-gray-600 hover:text-gray-900'
-              }`}
-            >
-              <Award className="w-5 h-5 inline mr-2" />
-              Dashboard
-            </button>
-            <button
-              onClick={() => setActiveTab('approvals')}
-              className={`whitespace-nowrap px-4 sm:px-6 py-4 font-medium transition-colors relative ${
-                activeTab === 'approvals'
-                  ? 'text-blue-600 border-b-2 border-blue-600'
-                  : 'text-gray-600 hover:text-gray-900'
-              }`}
-            >
-              <Clock className="w-5 h-5 inline mr-2" />
-              Approval Requests
-              {metrics.pendingRequests > 0 && (
-                <span className="absolute -top-1 -right-2 bg-red-500 text-white text-xs rounded-full h-5 w-5 flex items-center justify-center">
-                  {metrics.pendingRequests}
-                </span>
-              )}
-            </button>
-            <button
-              onClick={() => setActiveTab('students')}
-              className={`whitespace-nowrap px-4 sm:px-6 py-4 font-medium transition-colors ${
-                activeTab === 'students'
-                  ? 'text-blue-600 border-b-2 border-blue-600'
-                  : 'text-gray-600 hover:text-gray-900'
-              }`}
-            >
-              <Users className="w-5 h-5 inline mr-2" />
-              All Students
-            </button>
-            <button
-              onClick={() => setActiveTab('companies')}
-              className={`whitespace-nowrap px-4 sm:px-6 py-4 font-medium transition-colors ${
-                activeTab === 'companies'
-                  ? 'text-blue-600 border-b-2 border-blue-600'
-                  : 'text-gray-600 hover:text-gray-900'
-              }`}
-            >
-              <Building2 className="w-5 h-5 inline mr-2" />
-              Companies
-            </button>
-            <button
-              onClick={() => setActiveTab('jobs')}
-              className={`whitespace-nowrap px-4 sm:px-6 py-4 font-medium transition-colors ${
-                activeTab === 'jobs'
-                  ? 'text-blue-600 border-b-2 border-blue-600'
-                  : 'text-gray-600 hover:text-gray-900'
-              }`}
-            >
-              <Briefcase className="w-5 h-5 inline mr-2" />
-              Job Drives
-            </button>
+      {isMobileMenuOpen && (
+        <div className="lg:hidden fixed inset-0 z-50">
+          <div className="absolute inset-0 bg-black/50" onClick={() => setIsMobileMenuOpen(false)} />
+          <div className="absolute left-0 top-0 h-full w-72 bg-white shadow-xl">
+            <div className="flex items-center justify-between p-4 border-b border-gray-200">
+              <h2 className="font-bold text-gray-900">Menu</h2>
+              <button onClick={() => setIsMobileMenuOpen(false)} className="p-2 hover:bg-gray-100 rounded-lg">
+                <X className="w-5 h-5 text-gray-600" />
+              </button>
+            </div>
+
+            <nav className="py-4">
+              <ul className="space-y-1 px-2">
+                {menuItems.map((item) => (
+                  <li key={item.id}>
+                    <button
+                      onClick={() => {
+                        setActiveTab(item.id);
+                        setIsMobileMenuOpen(false);
+                      }}
+                      className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg text-left relative ${
+                        activeTab === item.id ? 'bg-blue-50 text-blue-600' : 'text-gray-700 hover:bg-gray-100'
+                      }`}
+                    >
+                      <item.icon className="w-5 h-5" />
+                      <span className="text-sm font-medium">{item.label}</span>
+                      {item.id === 'approvals' && metrics.pendingRequests > 0 && (
+                        <span className="ml-auto bg-red-500 text-white text-xs rounded-full h-5 min-w-5 px-1 flex items-center justify-center">
+                          {metrics.pendingRequests}
+                        </span>
+                      )}
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            </nav>
+
+            <div className="absolute bottom-0 left-0 right-0 p-4 border-t border-gray-200 bg-white">
+              <button
+                onClick={logout}
+                className="w-full flex items-center gap-3 px-4 py-3 text-red-600 hover:bg-red-50 rounded-lg"
+              >
+                <LogOut className="w-5 h-5" />
+                <span className="text-sm font-medium">Logout</span>
+              </button>
+            </div>
           </div>
         </div>
-      </nav>
+      )}
 
-      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        {renderContent()}
-      </main>
+      <main className="lg:ml-72 px-4 sm:px-6 lg:px-8 py-6 sm:py-8">{renderContent()}</main>
     </div>
   );
 }

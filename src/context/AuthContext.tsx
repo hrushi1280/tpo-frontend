@@ -15,39 +15,48 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       const storedType = localStorage.getItem('tpo_user_type');
       const sessionId = localStorage.getItem('session_id');
 
-      if (storedUser && storedType && sessionId) {
-        try {
-          const parsedUser = JSON.parse(storedUser);
-          
-          // For students, verify session is still valid
-          if (storedType === 'student') {
+      if (!storedUser || !storedType) {
+        setIsLoading(false);
+        return;
+      }
+
+      try {
+        const parsedUser = JSON.parse(storedUser) as Student | AdminUser;
+        const parsedType = storedType as 'student' | 'admin';
+
+        // Rehydrate immediately so refresh does not force logout.
+        setUser(parsedUser);
+        setUserType(parsedType);
+
+        // Only students have server-side active_session validation.
+        if (parsedType === 'student' && sessionId) {
+          try {
             const sessionStudent = await apiGet<{ valid: boolean }>(
               `/auth/session/student/${parsedUser.id}?session_id=${encodeURIComponent(sessionId)}`
             );
 
-            // If session doesn't match, clear local storage
             if (!sessionStudent.valid) {
               localStorage.removeItem('tpo_user');
               localStorage.removeItem('tpo_user_type');
               localStorage.removeItem('session_id');
               setUser(null);
               setUserType(null);
-              setIsLoading(false);
-              return;
             }
+          } catch (error) {
+            // Keep local session on transient network failure.
+            console.error('Session validation failed:', error);
           }
-
-          setUser(parsedUser);
-          setUserType(storedType as 'student' | 'admin');
-        } catch (error) {
-          console.error('Error parsing stored user:', error);
-          localStorage.removeItem('tpo_user');
-          localStorage.removeItem('tpo_user_type');
-          localStorage.removeItem('session_id');
         }
+      } catch (error) {
+        console.error('Error parsing stored user:', error);
+        localStorage.removeItem('tpo_user');
+        localStorage.removeItem('tpo_user_type');
+        localStorage.removeItem('session_id');
+        setUser(null);
+        setUserType(null);
+      } finally {
+        setIsLoading(false);
       }
-
-      setIsLoading(false);
     };
 
     initializeAuth();
@@ -61,11 +70,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   };
 
   const logout = async () => {
-    // Clear session for student
     if (userType === 'student' && user) {
       await logoutStudent(user.id);
     }
-    
+
     setUser(null);
     setUserType(null);
     localStorage.removeItem('tpo_user');
