@@ -1,4 +1,13 @@
-const API_BASE_URL = import.meta.env.VITE_BACKEND_URL || 'http://localhost:8000';
+const rawApiUrl =
+  import.meta.env.VITE_API_URL ||
+  import.meta.env.VITE_BACKEND_URL ||
+  (import.meta.env.DEV ? 'http://localhost:8000' : '');
+
+const API_BASE_URL = String(rawApiUrl || '').replace(/\/+$/, '');
+
+if (!API_BASE_URL) {
+  throw new Error('Missing API base URL. Set VITE_API_URL in environment variables.');
+}
 
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
   const response = await fetch(`${API_BASE_URL}${path}`, {

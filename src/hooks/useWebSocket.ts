@@ -16,7 +16,13 @@ type UseWebSocketOptions = {
   onError?: (error: Event) => void;
 };
 
-const WS_BASE_URL = import.meta.env.VITE_WS_URL || 'ws://localhost:8000';
+const rawWsUrl = import.meta.env.VITE_WS_URL || '';
+const fallbackWsFromApi = (import.meta.env.VITE_API_URL || '').replace(/^http/, 'ws');
+const WS_BASE_URL = rawWsUrl || fallbackWsFromApi || (import.meta.env.DEV ? 'ws://localhost:8000' : '');
+
+if (!WS_BASE_URL) {
+  throw new Error('Missing WebSocket base URL. Set VITE_WS_URL in environment variables.');
+}
 
 export function useWebSocket(options: UseWebSocketOptions = {}) {
   const { user, userType } = useAuth();
